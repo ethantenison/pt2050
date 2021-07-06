@@ -1,0 +1,407 @@
+---
+title: "PT2050 ENGO"
+author: "Patrick Bixler"
+date: "01/08/2021"
+output: html_document
+---
+
+```{r include=FALSE}
+source("utils1.R")
+```
+
+```{r Clean Network Data, include=FALSE}
+
+#edgelist 
+el1<-el1
+e1<-as.matrix(el1)
+e1[,1]=as.character(e1[,1])
+e1[,2]=as.character(e1[,2])
+e1[,3]=as.character(e1[,3])
+e1[,4]=as.character(e1[,4])
+e1[,5]=as.character(e1[,5])
+
+#edgelist 
+el2<-el2
+e2<-as.matrix(el2)
+e2[,1]=as.character(e2[,1])
+e2[,2]=as.character(e2[,2])
+
+
+g1<-graph_from_data_frame(d=el1,directed=TRUE) 
+#Some stats like communities and clusters need undirected graphs. Mode = collapse creates an undirected link between any pair of connected nodes. Weight should be "the nature of the tie"==communicate (1); coordinate (2), collaborate (3) but have not coded this yet. 
+
+
+
+
+
+
+g2<-graph_from_data_frame(d=el2,directed=TRUE) 
+#Some stats like communities and clusters need undirected graphs. Mode = collapse creates an undirected link between any pair of connected nodes. Weight should be "the nature of the tie"==communicate (1); coordinate (2), collaborate (3) but have not coded this yet. 
+#g1_un<-as.undirected(g1, mode= "collapse",edge.attr.comb=list(weight="sum", "ignore"))
+
+
+#Create a nodelist for excel use 
+gvis<-toVisNetworkData(g1)
+nodelist<-gvis$nodes
+nodelist<-nodelist[,1]
+nodelist<-as.data.frame(nodelist)
+names(nodelist)<-c("name")
+
+write.csv(nodelist,file = "Nodelist.csv")
+
+#Create a nodelist for excel use 
+gvis2<-toVisNetworkData(g2)
+nodelist2<-gvis2$nodes
+nodelist2<-nodelist[,1]
+nodelist2<-as.data.frame(nodelist2)
+names(nodelist2)<-c("name")
+
+write.csv(nodelist2,file = "Nodelist2.csv")
+```
+#ego-centric network measures
+```{r echo=FALSE}
+#Degree in 
+
+inDegree1<-igraph::degree(g1,mode="in")
+outDegree1<-igraph::degree(g1,mode="out")
+TotalDegree1<-as.data.frame(igraph::degree(g1))
+betweenness1<-igraph::betweenness(g1, v = V(g1), directed = TRUE, weights = NULL,
+  nobigint = TRUE, normalized = TRUE)
+inCloseness1<-igraph::closeness(g1, vids = V(g1), mode = c("in"),normalized = TRUE)
+outCloseness1<-igraph::closeness(g1, vids = V(g1), mode = c("out"),normalized = TRUE)
+#eigen<-evcent(m1,g=1,gmode = "digraph",rescale=TRUE, ignore.eval=TRUE)
+#removed eigen from this DF_Centrality
+DF_Centrality1<-as.data.frame(cbind(rownames(TotalDegree1),inDegree1,outDegree1,TotalDegree1,betweenness1,inCloseness1,outCloseness1))
+rownames(DF_Centrality1)<-NULL
+DF_Centrality1<-as.data.frame(DF_Centrality1)
+colnames(DF_Centrality1)[1]<-"name"
+colnames(DF_Centrality1)[4]<-"TotalDegree"
+
+par(mfcol = c(4,3)) 
+hist(inDegree1)
+hist(outDegree1)
+hist(TotalDegree1)
+hist(betweenness1)
+hist(inCloseness1)
+hist(outCloseness1)
+
+dd.g1<-degree.distribution(g1)
+d<-1:max(TotalDegree1)-1
+ind<-(dd.g1 != 0)
+plot(d[ind],dd.g1[ind],log="xy",col="blue",xlab=c("Log-degree"),ylab=c("Log-Intensity"),
+     main="Log-Log Degree Distribution")
+
+txengocentrality<-merge(DF_Centrality1, nodelist, by = "name")
+write.csv(txengocentrality,file = "TX ENGO Centrality.csv")
+
+loc <- read_csv("coordinates.csv",
+                col_types = cols(X1 = col_skip()))
+
+attr_nodelist<-merge(txengocentrality, loc, by = "name",all.x = TRUE)
+input_attributes<-attr_nodelist
+input_attributes$Orgtype[is.na(input_attributes$Orgtype)] <- "Federal Agency"
+write.csv(attr_nodelist,file = "Nodelist.csv")
+```
+#Meeting network
+```{r echo=FALSE}
+el_meetings<-el1[which(el1$Type1_meeting=="1"),]
+e_meetings<-as.matrix(el_meetings)
+
+g1_meetings<-graph_from_data_frame(d=e_meetings,directed=TRUE) 
+
+#plot(g1_meetings)
+
+```
+#Equity network
+```{r echo=FALSE}
+el_equity<-el1[which(el1$Type3_equity=="1"),]
+e_equity<-as.matrix(el_equity)
+g1_equity<-graph_from_data_frame(d=e_equity,directed=TRUE) 
+
+#Define Attributes
+for (i in 1:vcount(g1_equity))
+{
+V(g1_equity)[i]$county<-input_attributes$County[which(input_attributes$name==V(g1_equity)[i]$name)]
+V(g1_equity)[i]$type<-input_attributes$Orgtype[which(input_attributes$name==V(g1_equity)[i]$name)]
+V(g1_equity)[i]$address<-input_attributes$address[which(input_attributes$name==V(g1_equity)[i]$name)]
+V(g1_equity)[i]$size<-input_attributes$TotalDegree[which(input_attributes$name==V(g1_equity)[i]$name)]
+}
+
+lnodes <- data.frame(label = c("Non-Governmental","Municipal/County", "State Agency","Federal Agency","University","Private","Austin","Dallas", "Houston", "San Antonio", "Others"),
+color.background = c("white", "white", "white", "white", "white","white","green", "blue","red", "yellow", "#87CEEB"),
+color.border = c("black","black","black","black","black","black","black","black","black","black","black"),
+shape=c("dot","square","triangle","triangleDown","star","diamond", "square", "square", "square", "square", "square"))
+
+V(g1_equity)$shape<-"Null"
+
+V(g1_equity)[which(V(g1_equity)$address=="Dallas, TX")]$color<-"blue"
+V(g1_equity)[which(V(g1_equity)$address=="Houston, TX")]$color<-"red"
+V(g1_equity)[which(V(g1_equity)$address=="Austin, TX")]$color<-"green"
+V(g1_equity)[which(V(g1_equity)$address=="San Antonio, TX")]$color<-"yellow"
+
+V(g1_equity)[which(V(g1_equity)$type=="NGO")]$shape<-"dot"
+V(g1_equity)[which(V(g1_equity)$type=="Municipal/County")]$shape<-"square"
+V(g1_equity)[which(V(g1_equity)$type=="State Agency")]$shape<-"triangle"
+V(g1_equity)[which(V(g1_equity)$type=="Federal Agency")]$shape<-"triangleDown"
+V(g1_equity)[which(V(g1_equity)$type=="University")]$shape<-"star"
+V(g1_equity)[which(V(g1_equity)$type=="Private")]$shape<-"diamond"
+
+V(g1_equity)$size<-V(g1_equity)$size*2
+
+gvis_equity<-toVisNetworkData(g1_equity)
+nodelist_equity<-gvis_equity$nodes
+
+
+visNetwork(sort(gvis_equity$nodes),gvis_equity$edges, main="PT 2050 equity-focused Network",width = "100%",height = "850px") %>%
+  visLayout(randomSeed = 123) %>%
+  visEdges(smooth =T,
+           arrows =list(to = list(enabled = TRUE, scaleFactor = .5)),
+           color = list(color = "lightblue", highlight = "black"))  %>% 
+  visPhysics(stabilization = FALSE)  %>%
+  visIgraphLayout(smooth=FALSE,physics=FALSE, layout="layout_nicely") %>%
+  visLayout(randomSeed = 123,improvedLayout = TRUE)%>%
+  visInteraction(navigationButtons = TRUE)%>%
+  visOptions(selectedBy = list(variable = c("county"), multiple = TRUE),
+             highlightNearest = list(enabled = T, hover = T),
+             nodesIdSelection = TRUE)%>%
+  addFontAwesome() %>%
+  visLegend(position = "left", addNodes = lnodes, useGroups = FALSE,stepY=100)
+
+#plot(g1_equity)
+```
+
+#Resilience network
+```{r echo=FALSE}
+el_resilience<-el1[which(el1$Type2_resilience=="1"),]
+e_resilience<-as.matrix(el_resilience)
+g1_resilience<-graph_from_data_frame(d=e_resilience,directed=TRUE) 
+
+#Define Attributes
+for (i in 1:vcount(g1_resilience))
+{
+V(g1_resilience)[i]$county<-input_attributes$County[which(input_attributes$name==V(g1_resilience)[i]$name)]
+V(g1_resilience)[i]$type<-input_attributes$Orgtype[which(input_attributes$name==V(g1_resilience)[i]$name)]
+V(g1_resilience)[i]$address<-input_attributes$address[which(input_attributes$name==V(g1_resilience)[i]$name)]
+V(g1_resilience)[i]$size<-input_attributes$TotalDegree[which(input_attributes$name==V(g1_resilience)[i]$name)]
+}
+
+lnodes <- data.frame(label = c("Non-Governmental","Municipal/County", "State Agency","Federal Agency","University","Private","Austin","Dallas", "Houston", "San Antonio", "Others"),
+color.background = c("white", "white", "white", "white", "white","white","green", "blue","red", "yellow", "#87CEEB"),
+color.border = c("black","black","black","black","black","black","black","black","black","black","black"),
+shape=c("dot","square","triangle","triangleDown","star","diamond", "square", "square", "square", "square", "square"))
+
+V(g1_resilience)$shape<-"Null"
+
+V(g1_resilience)[which(V(g1_resilience)$address=="Dallas, TX")]$color<-"blue"
+V(g1_resilience)[which(V(g1_resilience)$address=="Houston, TX")]$color<-"red"
+V(g1_resilience)[which(V(g1_resilience)$address=="Austin, TX")]$color<-"green"
+V(g1_resilience)[which(V(g1_resilience)$address=="San Antonio, TX")]$color<-"yellow"
+
+V(g1_resilience)[which(V(g1_resilience)$type=="NGO")]$shape<-"dot"
+V(g1_resilience)[which(V(g1_resilience)$type=="Municipal/County")]$shape<-"square"
+V(g1_resilience)[which(V(g1_resilience)$type=="State Agency")]$shape<-"triangle"
+V(g1_resilience)[which(V(g1_resilience)$type=="Federal Agency")]$shape<-"triangleDown"
+V(g1_resilience)[which(V(g1_resilience)$type=="University")]$shape<-"star"
+V(g1_resilience)[which(V(g1_resilience)$type=="Private")]$shape<-"diamond"
+
+V(g1_resilience)$size<-V(g1_resilience)$size*2
+
+gvis_resilience<-toVisNetworkData(g1_resilience)
+nodelist_resilience<-gvis_resilience$nodes
+
+
+visNetwork(sort(gvis_resilience$nodes),gvis_resilience$edges, main="PT 2050 Resilience-focused Network",width = "100%",height = "850px") %>%
+  visLayout(randomSeed = 123) %>%
+  visEdges(smooth =T,
+           arrows =list(to = list(enabled = TRUE, scaleFactor = .5)),
+           color = list(color = "lightblue", highlight = "black"))  %>% 
+  visPhysics(stabilization = FALSE)  %>%
+  visIgraphLayout(smooth=FALSE,physics=FALSE, layout="layout_nicely") %>%
+  visLayout(randomSeed = 123,improvedLayout = TRUE)%>%
+  visInteraction(navigationButtons = TRUE)%>%
+  visOptions(selectedBy = list(variable = c("county"), multiple = TRUE),
+             highlightNearest = list(enabled = T, hover = T),
+             nodesIdSelection = TRUE)%>%
+  addFontAwesome() %>%
+  visLegend(position = "left", addNodes = lnodes, useGroups = FALSE,stepY=100)
+
+
+#plot(g1_resilience)
+```
+
+```{r define attributes, include=FALSE}
+
+#Define Attributes
+for (i in 1:vcount(g1))
+{
+V(g1)[i]$county<-input_attributes$County[which(input_attributes$name==V(g1)[i]$name)]
+V(g1)[i]$type<-input_attributes$Orgtype[which(input_attributes$name==V(g1)[i]$name)]
+V(g1)[i]$address<-input_attributes$address[which(input_attributes$name==V(g1)[i]$name)]
+}
+```
+
+
+#visualize Planet Texas network
+```{r echo=FALSE}
+#Define Attributes
+for (i in 1:vcount(g1))
+{
+V(g1)[i]$county<-input_attributes$County[which(input_attributes$name==V(g1)[i]$name)]
+V(g1)[i]$type<-input_attributes$Orgtype[which(input_attributes$name==V(g1)[i]$name)]
+V(g1)[i]$address<-input_attributes$address[which(input_attributes$name==V(g1)[i]$name)]
+V(g1)[i]$size<-input_attributes$inDegree1[which(input_attributes$name==V(g1)[i]$name)]
+}
+
+lnodes <- data.frame(label = c("Non-Governmental","Municipal/County", "State Agency","Federal Agency","University","Private","Austin","Dallas", "Houston", "San Antonio", "Others"),
+color.background = c("white", "white", "white", "white", "white","white","green", "blue","red", "yellow", "#87CEEB"),
+color.border = c("black","black","black","black","black","black","black","black","black","black","black"),
+shape=c("dot","square","triangle","triangleDown","star","diamond", "square", "square", "square", "square", "square"))
+
+
+V(g1)$shape<-"Null"
+
+V(g1)[which(V(g1)$address=="Dallas, TX")]$color<-"blue"
+V(g1)[which(V(g1)$address=="Houston, TX")]$color<-"red"
+V(g1)[which(V(g1)$address=="Austin, TX")]$color<-"green"
+V(g1)[which(V(g1)$address=="San Antonio, TX")]$color<-"yellow"
+
+V(g1)[which(V(g1)$type=="NGO")]$shape<-"dot"
+V(g1)[which(V(g1)$type=="Municipal/County")]$shape<-"square"
+V(g1)[which(V(g1)$type=="State Agency")]$shape<-"triangle"
+V(g1)[which(V(g1)$type=="Federal Agency")]$shape<-"triangleDown"
+V(g1)[which(V(g1)$type=="University")]$shape<-"star"
+V(g1)[which(V(g1)$type=="Private")]$shape<-"diamond"
+
+V(g1)$size<-V(g1)$size*3
+
+gvis1<-toVisNetworkData(g1)
+nodelist1<-gvis1$nodes
+
+
+pt2050network<-visNetwork(sort(gvis1$nodes),gvis1$edges, main="PT 2050 Network",width = "100%",height = "850px") %>%
+  visLayout(randomSeed = 123) %>%
+  visEdges(smooth =T,
+           arrows =list(to = list(enabled = TRUE, scaleFactor = .5)),
+           color = list(color = "lightblue", highlight = "black"))  %>% 
+  visPhysics(stabilization = FALSE)  %>%
+  visIgraphLayout(smooth=FALSE,physics=FALSE, layout="layout_nicely") %>%
+  visLayout(randomSeed = 123,improvedLayout = TRUE)%>%
+  visInteraction(navigationButtons = TRUE)%>%
+  visOptions(selectedBy = list(variable = c("county"), multiple = TRUE),
+             highlightNearest = list(enabled = T, hover = T),
+             nodesIdSelection = TRUE)%>%
+  addFontAwesome() %>%
+  visLegend(position = "left", addNodes = lnodes, useGroups = FALSE,stepY=100)
+
+pt2050network
+
+
+```
+#ego-centric network measures for subnetworks
+```{r echo=FALSE}
+#Degree in 
+
+inDegreeR<-igraph::degree(g1_resilience,mode="in")
+outDegreeR<-igraph::degree(g1_resilience,mode="out")
+TotalDegreeR<-as.data.frame(igraph::degree(g1_resilience))
+betweennessR<-igraph::betweenness(g1_resilience, v = V(g1_resilience), directed = TRUE, weights = NULL,
+  nobigint = TRUE, normalized = TRUE)
+inClosenessR<-igraph::closeness(g1_resilience, vids = V(g1_resilience), mode = c("in"),normalized = TRUE)
+outClosenessR<-igraph::closeness(g1_resilience, vids = V(g1_resilience), mode = c("out"),normalized = TRUE)
+DF_CentralityR<-as.data.frame(cbind(rownames(TotalDegreeR),inDegreeR,outDegreeR,TotalDegreeR,betweennessR,inClosenessR,outClosenessR))
+rownames(DF_CentralityR)<-NULL
+DF_CentralityR<-as.data.frame(DF_CentralityR)
+colnames(DF_CentralityR)[1]<-"name"
+colnames(DF_CentralityR)[4]<-"TotalDegreeR"
+
+inDegreeE<-igraph::degree(g1_equity,mode="in")
+outDegreeE<-igraph::degree(g1_equity,mode="out")
+TotalDegreeE<-as.data.frame(igraph::degree(g1_equity))
+betweennessE<-igraph::betweenness(g1_equity, v = V(g1_equity), directed = TRUE, weights = NULL,
+  nobigint = TRUE, normalized = TRUE)
+inClosenessE<-igraph::closeness(g1_equity, vids = V(g1_equity), mode = c("in"),normalized = TRUE)
+outClosenessE<-igraph::closeness(g1_equity, vids = V(g1_equity), mode = c("out"),normalized = TRUE)
+DF_CentralityE<-as.data.frame(cbind(rownames(TotalDegreeE),inDegreeE,outDegreeE,TotalDegreeE,betweennessE,inClosenessE,outClosenessE))
+rownames(DF_CentralityE)<-NULL
+DF_CentralityE<-as.data.frame(DF_CentralityE)
+colnames(DF_CentralityE)[1]<-"name"
+colnames(DF_CentralityE)[4]<-"TotalDegreeE"
+
+inDegreeM<-igraph::degree(g1_meetings,mode="in")
+outDegreeM<-igraph::degree(g1_meetings,mode="out")
+TotalDegreeM<-as.data.frame(igraph::degree(g1_meetings))
+betweennessM<-igraph::betweenness(g1_meetings, v = V(g1_meetings), directed = TRUE, weights = NULL,
+  nobigint = TRUE, normalized = TRUE)
+inClosenessM<-igraph::closeness(g1_meetings, vids = V(g1_meetings), mode = c("in"),normalized = TRUE)
+outClosenessM<-igraph::closeness(g1_meetings, vids = V(g1_meetings), mode = c("out"),normalized = TRUE)
+DF_CentralityM<-as.data.frame(cbind(rownames(TotalDegreeM),inDegreeM,outDegreeM,TotalDegreeM,betweennessM,inClosenessM,outClosenessM))
+rownames(DF_CentralityM)<-NULL
+DF_CentralityM<-as.data.frame(DF_CentralityM)
+colnames(DF_CentralityM)[1]<-"name"
+colnames(DF_CentralityM)[4]<-"TotalDegreeM"
+
+DF_CentralityM<-merge(DF_CentralityM, DF_CentralityE, by = "name")
+DF_CentralityR<-merge(DF_CentralityR, DF_CentralityM, by = "name")
+txengocentrality<-merge(txengocentrality, DF_CentralityR, by = "name")
+write.csv(txengocentrality,file = "TX ENGO Centrality.csv")
+
+
+
+attr_nodelist<-merge(attr_nodelist, txengocentrality, by = "name",all.x = TRUE)
+write.csv(attr_nodelist,file = "Nodelist.csv")
+
+
+```
+
+#visualize Planet Texas Funder network
+##Not READY
+{r echo=FALSE}
+#Define Attributes
+for (i in 1:vcount(g2))
+{
+V(g2)[i]$county<-input_attributes$County[which(input_attributes$name==V(g2)[i]$name)]
+V(g2)[i]$type<-input_attributes$Orgtype[which(input_attributes$name==V(g2)[i]$name)]
+V(g2)[i]$address<-input_attributes$address[which(input_attributes$name==V(g2)[i]$name)]
+V(g2)[i]$size<-input_attributes$inDegree1[which(input_attributes$name==V(g2)[i]$name)]
+}
+
+lnodes <- data.frame(label = c("Non-Governmental","Municipal/County", "State Agency","Federal Agency","University","Private","Austin","Dallas", "Houston", "San Antonio", "Others"),
+color.background = c("white", "white", "white", "white", "white","white","green", "blue","red", "yellow", "#87CEEB"),
+color.border = c("black","black","black","black","black","black","black","black","black","black","black"),
+shape=c("dot","square","triangle","triangleDown","star","diamond", "square", "square", "square", "square", "square"))
+
+
+V(g2)$shape<-"Null"
+
+V(g2)[which(V(g2)$address=="Dallas, TX")]$color<-"blue"
+V(g2)[which(V(g2)$address=="Houston, TX")]$color<-"red"
+V(g2)[which(V(g2)$address=="Austin, TX")]$color<-"green"
+V(g2)[which(V(g2)$address=="San Antonio, TX")]$color<-"yellow"
+
+V(g2)[which(V(g2)$type=="NGO")]$shape<-"dot"
+V(g2)[which(V(g2)$type=="Municipal/County")]$shape<-"square"
+V(g2)[which(V(g2)$type=="State Agency")]$shape<-"triangle"
+V(g2)[which(V(g2)$type=="Federal Agency")]$shape<-"triangleDown"
+V(g2)[which(V(g2)$type=="University")]$shape<-"star"
+V(g2)[which(V(g2)$type=="Private")]$shape<-"diamond"
+
+V(g2)$size<-V(g2)$size*3
+
+gvis2<-toVisNetworkData(g2)
+nodelist2<-gvis2$nodes
+
+
+visNetwork(sort(gvis2$nodes),gvis2$edges, main="PT 2050 Funder Network",width = "100%",height = "850px") %>%
+  visLayout(randomSeed = 123) %>%
+  visEdges(smooth =T,
+           arrows =list(to = list(enabled = TRUE, scaleFactor = .5)),
+           color = list(color = "lightblue", highlight = "black"))  %>% 
+  visPhysics(stabilization = FALSE)  %>%
+  visIgraphLayout(smooth=FALSE,physics=FALSE, layout="layout_nicely") %>%
+  visLayout(randomSeed = 123,improvedLayout = TRUE)%>%
+  visInteraction(navigationButtons = TRUE)%>%
+  visOptions(selectedBy = list(variable = c("county"), multiple = TRUE),
+             highlightNearest = list(enabled = T, hover = T),
+             nodesIdSelection = TRUE)%>%
+  addFontAwesome() %>%
+  visLegend(position = "left", addNodes = lnodes, useGroups = FALSE,stepY=100)
