@@ -104,40 +104,12 @@ sidebar <- dashboardSidebar(
                     "Equity-focused Network" = "g1_equity"
                 )
             )),
-            div(id = "switches",
-            materialSwitch(
-                inputId = "geographic",
-                label = "Geographic Network",
-                status = "default",
-                right = TRUE,
-                value = FALSE
-            ),    
-            materialSwitch(
-                inputId = "edgenames",
-                label = "Connection Names",
-                status = "default",
-                right = TRUE,
-                value = FALSE
-            ),
-            materialSwitch(
-                inputId = "nodenames",
-                label = "Organization Names",
-                status = "default",
-                right = TRUE,
-                value = TRUE
-            )),
-            actionButton(
-                "help",
-                "Tutorial",
-                icon = icon("book-open", class = "fa-pull-left"),
-                style = "display: block; margin: 0 auto; width: 200px;color: #152934"
-            ),
             hr(style = "margin-top: 5px; margin-bottom: 5px; width:90%"),
         ),
-        menuItem("Network Data",
-                 tabName = "table",
+        menuItem("Network Map",
+                 tabName = "network_map",
                  icon = icon("table")),
-        conditionalPanel(condition = "input.tabs == 'table'",
+        conditionalPanel(condition = "input.tabs == 'network_map'",
                          selectInput(
                              "sectors_table",
                              "Sector",
@@ -216,7 +188,7 @@ body <- dashboardBody(
                         div(id = "visnetwork", visNetworkOutput("twg_network", height = "700px"))
                     )
                 ))),
-        tabItem(tabName = "table",
+        tabItem(tabName = "network_map",
                 fluidRow(
                     #HTML('<center><img src="images/logo2.png" width="700"></center>'),
                     hr()
@@ -241,36 +213,90 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
     
+    #Network Title ------------------------------------------------------------
+    output$network_title <- renderText({
+        titles[[input$focus]]
+    })
     
+    
+    #Network VisNetwork -------------------------------------------------------
     output$twg_network <- renderVisNetwork({
         gvis <-
             toVisNetworkData(data[[input$focus]])
         
         nodes <- sort(gvis$nodes)
-        nodes <- nodes %>% mutate(font.size = 20)
-        
-        
+        nodes <- nodes |> mutate(font.size = 20)
         edges <- gvis$edges
+        
+        lnodes <-
+            data.frame(
+                label = c(
+                    "Non-Governmental",
+                    "Municipal/County",
+                    "State Agency",
+                    "Federal Agency",
+                    "University",
+                    "Private",
+                    "Austin",
+                    "Dallas",
+                    "Houston",
+                    "San Antonio",
+                    "Others"
+                ),
+                color.background = c(
+                    "white",
+                    "white",
+                    "white",
+                    "white",
+                    "white",
+                    "white",
+                    "green",
+                    "blue",
+                    "red",
+                    "yellow",
+                    "#87CEEB"
+                ),
+                color.border = c(
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black",
+                    "black"
+                ),
+                shape = c(
+                    "dot",
+                    "square",
+                    "triangle",
+                    "triangleDown",
+                    "star",
+                    "diamond",
+                    "square",
+                    "square",
+                    "square",
+                    "square",
+                    "square"
+                )
+            )
+        
         
         network <- visNetwork(nodes,
                               edges,
                               #main = titles[[input$sectors]],
                               width = "100%",
-                              height = "850px") %>%
+                              height = "850px") |>
             visEdges(
+                smooth = T,
                 arrows = list(to = list(
                     enabled = TRUE, scaleFactor = .5
                 )),
-                color = list(highlight = "black"),
-                width = 3,
-                label = TRUE
-            ) %>%
-            visNodes(color = list(
-                background = "white",
-                border = "black",
-                highlight = list(background = "#A9A9A9", border = "black"),
-                hover = list(background = "#A9A9A9", border = "black")
-            )) %>%
+                color = list(color = "lightblue", highlight = "black")
+            ) |>
             visIgraphLayout(
                 smooth = list(enabled = T, type = 'dynamic'),
                 physics = list(
@@ -278,16 +304,22 @@ server <- function(input, output, session) {
                     solver = "forceAtlas2Based",
                     forceAtlas2Based = list(gravitationalConstant = -500)
                 ),
-                layout = "layout_with_kk",
-                randomSeed = 27
-            ) %>%
-            visInteraction(navigationButtons = FALSE) %>%
+                layout = "layout_nicely",
+                randomSeed = 123
+            ) |>
+            visInteraction(navigationButtons = FALSE) |>
             visOptions(
-                selectedBy = list(variable = c("type"), multiple = TRUE),
+                selectedBy = list(variable = c("county"), multiple = TRUE),
                 highlightNearest = list(enabled = T, hover = T),
                 nodesIdSelection = TRUE
-            ) %>%
-            addFontAwesome()
+            ) |>
+            addFontAwesome() |>
+            visLegend(
+                position = "right",
+                addNodes = lnodes,
+                useGroups = FALSE,
+                stepY = 100
+            )
         
         network
         
