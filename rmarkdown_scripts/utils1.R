@@ -27,8 +27,8 @@ library(tidyverse)
 library(openxlsx)
 library(htmlTable)
 
-
+setwd("C:/Users/tenis/Desktop/Data_Projects/pt2050/")
 #load data
-el1 <-read.csv("pt2050engo.csv")
-el2 <-read.csv("pt2050funder.csv")
+el1 <-read.csv("data/pt2050engo.csv")
+el2 <-read.csv("data/pt2050funder.csv")
 

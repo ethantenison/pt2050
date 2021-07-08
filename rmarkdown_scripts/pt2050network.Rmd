@@ -5,11 +5,17 @@ date: "01/08/2021"
 output: html_document
 ---
 
-```{r include=FALSE}
-source("utils1.R")
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
 ```
 
 ```{r Clean Network Data, include=FALSE}
+library(readr)
+setwd("C:/Users/tenis/Desktop/Data_Projects/pt2050/")
+source("rmarkdown_scripts/utils1.R")
 
 #edgelist 
 el1<-el1
@@ -47,7 +53,7 @@ nodelist<-nodelist[,1]
 nodelist<-as.data.frame(nodelist)
 names(nodelist)<-c("name")
 
-write.csv(nodelist,file = "Nodelist.csv")
+write.csv(nodelist,file = "data/Nodelist.csv")
 
 #Create a nodelist for excel use 
 gvis2<-toVisNetworkData(g2)
@@ -56,11 +62,12 @@ nodelist2<-nodelist[,1]
 nodelist2<-as.data.frame(nodelist2)
 names(nodelist2)<-c("name")
 
-write.csv(nodelist2,file = "Nodelist2.csv")
+write.csv(nodelist2,file = "data/Nodelist2.csv")
 ```
 #ego-centric network measures
 ```{r echo=FALSE}
 #Degree in 
+setwd("C:/Users/tenis/Desktop/Data_Projects/pt2050/")
 
 inDegree1<-igraph::degree(g1,mode="in")
 outDegree1<-igraph::degree(g1,mode="out")
@@ -92,15 +99,15 @@ plot(d[ind],dd.g1[ind],log="xy",col="blue",xlab=c("Log-degree"),ylab=c("Log-Inte
      main="Log-Log Degree Distribution")
 
 txengocentrality<-merge(DF_Centrality1, nodelist, by = "name")
-write.csv(txengocentrality,file = "TX ENGO Centrality.csv")
+write.csv(txengocentrality,file = "data/TX ENGO Centrality.csv")
 
-loc <- read_csv("coordinates.csv",
+loc <- read_csv("data/coordinates.csv",
                 col_types = cols(X1 = col_skip()))
 
 attr_nodelist<-merge(txengocentrality, loc, by = "name",all.x = TRUE)
 input_attributes<-attr_nodelist
 input_attributes$Orgtype[is.na(input_attributes$Orgtype)] <- "Federal Agency"
-write.csv(attr_nodelist,file = "Nodelist.csv")
+write.csv(attr_nodelist,file = "data/Nodelist.csv")
 ```
 #Meeting network
 ```{r echo=FALSE}
@@ -226,7 +233,6 @@ visNetwork(sort(gvis_resilience$nodes),gvis_resilience$edges, main="PT 2050 Resi
   visLegend(position = "left", addNodes = lnodes, useGroups = FALSE,stepY=100)
 
 
-#plot(g1_resilience)
 ```
 
 ```{r define attributes, include=FALSE}
@@ -349,6 +355,17 @@ write.csv(txengocentrality,file = "TX ENGO Centrality.csv")
 
 attr_nodelist<-merge(attr_nodelist, txengocentrality, by = "name",all.x = TRUE)
 write.csv(attr_nodelist,file = "Nodelist.csv")
+
+
+```
+
+
+```{r save}
+
+setwd("C:/Users/tenis/Desktop/Data_Projects/pt2050/")
+write_rds(g1, "data/network_full.rds")
+write_rds(g1_equity, "data/network_equity.rds")
+write_rds(g1_resilience, "data/network_resilience.rds")
 
 
 ```
