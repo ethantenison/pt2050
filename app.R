@@ -25,7 +25,8 @@ library(rsconnect)
 library(shinyjs)
 library(shinydashboard)
 library(shinydashboardPlus)
-library(rintrojs)
+library(leaflet)
+library(leaflet.extras)
 
 # ------------------------------- #
 # ------------------------------- #
@@ -39,23 +40,17 @@ library(rintrojs)
 g1 <- readRDS("./data/network_full.rds")
 g1_equity <- readRDS("./data/network_equity.rds")
 g1_resilience <- readRDS("./data/network_resilience.rds")
-
-
-data <- list(
-    "g1" = g1,
-    "g1_equity" = g1_equity,
-    "g1_resilience" = g1_resilience
-)
-
-
-
-
-
-titles <- list(
-    "g1" = "PT 2050 Network" ,
-    "g1_resilience" = "PT 2050 Resilience-focused Network",
-    "g1_equity" = "PT 2050 equity-focused Network"
-)
+coord <- read_csv("data/coordinates.csv") |>
+    select(name,Orgtype, lon, lat) |> 
+    mutate(Orgtype = as.factor(Orgtype))
+centrality <- read_csv("data/TX ENGO Centrality.csv") |> 
+    select(name, TotalDegree)
+data <- list("g1" = g1,
+             "g1_equity" = g1_equity,
+             "g1_resilience" = g1_resilience)
+titles <- list("g1" = "PT 2050 Network" ,
+               "g1_resilience" = "PT 2050 Resilience-focused Network",
+               "g1_equity" = "PT 2050 equity-focused Network")
 
 
 # ------------------------------- #
@@ -82,7 +77,6 @@ header <-
     dashboardHeader(title = h2("Controls", align = "center"))
 
 sidebar <- dashboardSidebar(
-    introjsUI(),
     useShinyjs(),
     shinyjs::extendShinyjs(text = jsToggleFS, functions = "toggleFullScreen"),
     sidebarMenu(
@@ -108,11 +102,11 @@ sidebar <- dashboardSidebar(
         ),
         menuItem("Network Map",
                  tabName = "network_map",
-                 icon = icon("table")),
+                 icon = icon("map")),
         conditionalPanel(condition = "input.tabs == 'network_map'",
                          selectInput(
-                             "sectors_table",
-                             "Sector",
+                             "map_focus",
+                             "Map Focus",
                              c(
                                  "PT 2050 Network" = "g1",
                                  "Resilience-focused Network" = "g1_equity",
@@ -165,7 +159,7 @@ body <- dashboardBody(
         .skin-blue .main-header .logo:hover {
                               background-color: #97c2fc;
         /* Network Title */                      }
-        #network_title, #network_title_legend{color: #152934;
+        #network_title, #networkmap_title, #network_title_legend{color: #152934;
                                  font-size: 20px;
                                  }'
         )
@@ -177,6 +171,7 @@ body <- dashboardBody(
     tabItems(
         tabItem(tabName = "graph",
                 fluidRow(
+                    h3("Planet Texas 2050"),
                     #HTML('<center><img src="images/logo3.png" width="800"></center>'),
                     hr()
                 ),
@@ -190,11 +185,17 @@ body <- dashboardBody(
                 ))),
         tabItem(tabName = "network_map",
                 fluidRow(
+                    h3("Planet Texas 2050"),
                     #HTML('<center><img src="images/logo2.png" width="700"></center>'),
                     hr()
                 ),
                 fluidRow(box(
-                    width = 12, DT::dataTableOutput("table")
+                    title = textOutput("networkmap_title"),
+                    width = 12,
+                    leafletOutput(
+                        "map",
+                        height = "700px"
+                    )
                 )))
     )
 )
@@ -218,8 +219,12 @@ server <- function(input, output, session) {
         titles[[input$focus]]
     })
     
+    output$networkmap_title <- renderText({
+        titles[[input$map_focus]]
+    })
     
-    #Network VisNetwork -------------------------------------------------------
+    
+    #VisNetwork ---------------------------------------------------------------
     output$twg_network <- renderVisNetwork({
         gvis <-
             toVisNetworkData(data[[input$focus]])
@@ -324,6 +329,57 @@ server <- function(input, output, session) {
         network
         
     })
+    
+    # Network Map -------------------------------------------------------------
+    nodes <- reactive({
+        gvis <-
+            toVisNetworkData(data[[input$map_focus]])
+        
+        nodes <- sort(gvis$nodes) |> 
+            left_join(coord, by = c("id" = "name")) |> 
+            left_join(centrality, by = c("id" = "name")) |> 
+            mutate(label = paste(id, "\n", TotalDegree))
+        nodes
+    })
+    
+    
+    pal <- reactive({ 
+        
+        colorFactor(
+            palette = c('red', 'green', 'blue', 'purple', "yellow", "orange"),
+            domain = nodes()$Orgtype
+        )
+        
+        
+    })
+    
+    output$map <- renderLeaflet({
+        pal <- pal()
+        
+        leaflet(nodes()) |> 
+            addProviderTiles(providers$Stamen.TonerLite) |> 
+            setView(-99.33584086660734, 31.13198248011147, zoom = 6) |> 
+            clearControls() |> 
+            clearMarkers() |> 
+            addCircleMarkers(
+                data = nodes(),
+                lng =  ~ nodes()$lon,
+                lat =  ~ nodes()$lat,
+                fillColor = ~pal(nodes()$Orgtype),
+                color = ~pal(nodes()$Orgtype),
+                radius = nodes()$TotalDegree + 2,
+                fillOpacity = 0.5,
+                label = nodes()$label
+            ) |> 
+            addLegend(data = nodes(),
+                      "bottomright",
+                      pal = pal,
+                      values = ~nodes()$Orgtype,
+                      title = "")
+        
+
+    })
+    
     
 
 }

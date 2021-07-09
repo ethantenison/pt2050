@@ -17,6 +17,9 @@ library(readr)
 setwd("C:/Users/tenis/Desktop/Data_Projects/pt2050/")
 source("rmarkdown_scripts/utils1.R")
 
+
+
+
 #edgelist 
 el1<-el1
 e1<-as.matrix(el1)
@@ -25,6 +28,9 @@ e1[,2]=as.character(e1[,2])
 e1[,3]=as.character(e1[,3])
 e1[,4]=as.character(e1[,4])
 e1[,5]=as.character(e1[,5])
+
+el1 <- el1 |> 
+  left_join(coord, by = c("Ego" = "name"))
 
 #edgelist 
 el2<-el2
@@ -35,9 +41,6 @@ e2[,2]=as.character(e2[,2])
 
 g1<-graph_from_data_frame(d=el1,directed=TRUE) 
 #Some stats like communities and clusters need undirected graphs. Mode = collapse creates an undirected link between any pair of connected nodes. Weight should be "the nature of the tie"==communicate (1); coordinate (2), collaborate (3) but have not coded this yet. 
-
-
-
 
 
 
