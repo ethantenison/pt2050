@@ -1,0 +1,80 @@
+---
+title: "Planet Texas 2050"
+description: |
+  Using new survey data.
+author:
+  - name: Ethan Tenison 
+    affiliation: RGK Center for Philanthropy and Community Service 
+    affiliation_url: https://rgkcenter.org/
+date: "`r format(Sys.Date(), '%B %d, %Y') `"
+output:
+  distill::distill_article:
+    code_folding: yes
+    toc: yes
+    toc_float: yes
+    theme: theme.css
+  pdf_document: default
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)  #A collection of packages that use the same grammar and structure
+library(qualtRics)  #For connecting to Qualtrics API
+library(matchingR)  #Contains Gale-Shapley Algorithm
+library(kableExtra) #Package for creating customizable tables
+library(janitor)    #data cleaning package
+library(labelled)   #Also dealing with labels
+library(visNetwork) #Creates html network widget
+library(igraph)     #network analysis 
+
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+```
+
+
+# Reading the data from Qualtrics
+
+```{r qualtircs}
+
+
+# Connecting to the Qualtrics API
+qualtrics_api_credentials(
+api_key = "0niuOUgg0bM7FJWr8f0eJzj1WbwcjCJfRFIW67x8", 
+base_url = "ca1.qualtrics.com", 
+install = FALSE,
+overwrite = TRUE
+)
+
+#Pulling surveys 
+surveys <- all_surveys() 
+
+#Finding the row index
+number <- which(surveys$name=="PT 2050 ENGOs in Texas - Final", arr.ind=TRUE)
+
+
+#Fetching the Survey Contents 
+df_raw <- fetch_survey(surveyID = surveys$id[number], force_request = TRUE)
+
+```
+
+# Data cleaning
+
+```{r cleaning}
+
+df <- df_raw |> 
+  clean_names() |> 
+  select(-c(1:17, q1_3:q1_8, q2_3_4:q2_4, q6_2_1:q6_2_x36,
+            q2_5_11_text, q7_2:q7_3, q7_17:q7_18)) |> #removing unnecessary columns
+  filter(!is.na(q1_2))
+
+
+```
+
+
+Consider strength of tie to be regular meetings 
+what networks would you like to see? 
+There are some interesting questions about weather, covid19, and working with vulnerable groups
+Before you publish the newer version, make sure that the majority of them have a required responses 
